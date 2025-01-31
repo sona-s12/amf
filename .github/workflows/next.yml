@@ -1,0 +1,57 @@
+name: Static Check Workflow
+on:
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: 'Repository in the format org/repo (e.g., orgA/repoA)'
+        required: true
+  # pull_request:
+  #   branches:
+  #     - main
+  # push:
+  #   branches:
+  #     - main
+
+jobs:
+  staticcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: WillAbides/setup-go-faster@v1.14.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Run Staticcheck
+        uses: dominikh/staticcheck-action@v1.3.1
+        with:
+          version: latest
+          install-go: false
+        continue-on-error: true 
+
+      - name: Capture Staticcheck Output
+        run: |
+          mkdir -p reports         
+          staticcheck ./... > reports/staticcheck.txt || true
+          cat reports/staticcheck.txt
+          
+      - name: Process Report
+        run: |
+          temp_report="reports/temp_report.txt"
+          if [ -s reports/staticcheck.txt ]; then
+            echo "Staticcheck found issues:" > $temp_report
+            cat reports/staticcheck.txt >> $temp_report
+          else
+            echo "Staticcheck has no issues." > $temp_report
+          fi
+          mv $temp_report reports/staticcheck.txt
+          cat reports/staticcheck.txt
+          
+      - name: Upload Staticcheck Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: staticcheck-report
+          path: reports/staticcheck.txt
+          retention-days: 14
